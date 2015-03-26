@@ -13,6 +13,11 @@ import time
 import csv
 import HTMLParser
 
+import hashlib
+import json
+
+
+
 # Script version. It's recommended to increment this with every change, to make
 # debugging easier.
 VERSION = '0.9.0'
@@ -38,7 +43,44 @@ def fund_lookup(main_file):
         return main
 
 
+def update_check(cache_folder, content_file):
+    #Check to see if content file had been uploaded before to avoid
+    #additional load on squirro/ftp servers 
+    m = hashlib.md5()
+    m.update(content_file)
+    key = m.hexdigest()
+
+    cache_file_path = "%s/%s.json" % (cache_folder, key)
+    try:
+        #HIT
+        with open(cache_file_path, 'rb') as cache_file:
+            return True
+    except IOError:
+        #MISS
+        with open(cache_file_path, 'wb') as cache_file:
+            with open(config.get('squirro_credentials','file'), 'rb') as contentfile:
+                content = csv.DictReader(contentfile, delimiter='|',quotechar=' ')
+                for row in content:
+                        cache_file.write(json.dumps(row, indent=4))
+                        cache_file.write('\n')
+        return False
+
+
 def main(args, config):
+
+    cache_folder = 'C:/_Squirro'
+    content_file = config.get('squirro_credentials','file')
+
+    if update_check(cache_folder,content_file):
+        print 'No new file detected'
+        if args.ignore_hash == 0:
+            print "Squirro not updated"
+            sys.exit(0)
+
+
+
+def main(args, config):
+
     with open(config.get('squirro_credentials','file'), 'rb') as contentfile:
         items = []
         h = HTMLParser.HTMLParser()
@@ -53,6 +95,14 @@ def main(args, config):
                 item['title'] = row['Title']
                 item['id'] = row['Article ID']
                 item['link'] = row['Article Link']
+
+                main = fund_lookup(config.get('squirro_credentials','main_file'))
+                for FundID in row['Related Funds'].split(','):
+                    print FundID
+                    if FundID in main:
+
+                        print 'True: ', FundID
+
                 # main = fund_lookup(config.get('squirro_credentials','main_file'))
                 # for FundID in row['Related Funds'].split(','):
                 #     print FundID
@@ -60,11 +110,16 @@ def main(args, config):
                 #         print main[FundID]['Fund']
                 # print related_funds
 
+
                 item['body'] = u"""
                     <html>
                         <head> 
                             <H6> 
+                            Source: {source} <br/>
+                            Date: {date}
+
                             Source: {source}
+
                             </H6>
                         </head>
                         <body>
@@ -75,7 +130,11 @@ def main(args, config):
                     </html>
                     """.format(source=row['Source'],
                                body=h.unescape(row['Body']).replace(h.unescape('&#92;n'),''),
+                               categories=", ".join(row['Categories'].split(',')),
+                               date=time.strftime("%Y-%m-%d", time.localtime()))    
+
                                categories=", ".join(row['Categories'].split(',')))    
+
                 #Add keywords      
                 ks = {} 
                 add_keyword(ks,row,'iiKeyword','Keywords')
@@ -101,6 +160,8 @@ def parse_args():
                         help='Log file on disk.')
     parser.add_argument('--config-file', dest='config_file',
                         help='Configuration file to read settings from.')
+    parser.add_argument('--ignore_hash','-ih', action="count", default=0,
+                        help='ignore any existing hash file and load from content')
     return parser.parse_args()
 
 

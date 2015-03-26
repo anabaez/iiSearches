@@ -12,10 +12,8 @@ import sys
 import time
 import csv
 import HTMLParser
-
 import hashlib
 import json
-
 
 
 # Script version. It's recommended to increment this with every change, to make
@@ -76,11 +74,9 @@ def main(args, config):
         if args.ignore_hash == 0:
             print "Squirro not updated"
             sys.exit(0)
-
-
-
-def main(args, config):
-
+    #Look for the csv content file
+    #iterate through each item pulling out the key information and construct 
+    #a squirro item for each
     with open(config.get('squirro_credentials','file'), 'rb') as contentfile:
         items = []
         h = HTMLParser.HTMLParser()

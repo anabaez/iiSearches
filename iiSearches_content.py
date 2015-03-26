@@ -69,14 +69,14 @@ def main(args, config):
     cache_folder = 'C:/_Squirro'
     content_file = config.get('squirro_credentials','file')
 
+    #check if the content file is new
     if update_check(cache_folder,content_file):
         print 'No new file detected'
         if args.ignore_hash == 0:
             print "Squirro not updated"
             sys.exit(0)
-    #Look for the csv content file
-    #iterate through each item pulling out the key information and construct 
-    #a squirro item for each
+
+    #open csv content file 
     with open(config.get('squirro_credentials','file'), 'rb') as contentfile:
         items = []
         h = HTMLParser.HTMLParser()
@@ -128,8 +128,6 @@ def main(args, config):
                                body=h.unescape(row['Body']).replace(h.unescape('&#92;n'),''),
                                categories=", ".join(row['Categories'].split(',')),
                                date=time.strftime("%Y-%m-%d", time.localtime()))    
-
-                               categories=", ".join(row['Categories'].split(',')))    
 
                 #Add keywords      
                 ks = {} 

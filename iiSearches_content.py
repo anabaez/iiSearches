@@ -67,7 +67,7 @@ def update_check(cache_folder, content_file):
 
 def main(args, config):
 
-    cache_folder = 'C:/_Squirro'
+    cache_folder = config.get('squirro_credentials','cache_folder')#'C:\Python27/iiSearches/cache'
     content_file = config.get('squirro_credentials','file')
 
     #check if the content file is new

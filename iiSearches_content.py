@@ -93,32 +93,7 @@ def main(args, config):
                 item['id'] = row['Article ID']
                 item['link'] = row['Article Link']
 
-                main = fund_lookup(config.get('squirro_credentials','main_file'))
-                for FundID in row['Related Funds'].split(','):
-                    print FundID
-                    if FundID in main:
-
-                        print 'True: ', FundID
-
-                main = fund_lookup(config.get('squirro_credentials','main_file'))
-
-                for FundID in row['Related Funds'].split(','):
-                    print FundID
-                    if FundID in main:
-                        print main[FundID]['Consultant Parent ID']
-                        print main[FundID]['Asset Class']
-                        print main[FundID]['Mandate ID']
-                        print main[FundID]['Search Consultant']
-                        print main[FundID]['Search Status']
-                        print main[FundID]['Last Updated']
-                        print main[FundID]['Region']
-                        print main[FundID]['Fund Type']
-                        print main[FundID]['Fund']
-                        print main[FundID]['Consultant ID']
-                        print main[FundID]['Sub Asset Class']
-                        print main[FundID]['Mandate Size Amount']
-                        print main[FundID]['Fund ID']
-
+                
                 item['body'] = u"""
                     <html>
                         <head> 
@@ -147,6 +122,25 @@ def main(args, config):
                 add_keyword(ks,row,'Related_Mandates','Related Mandates')
                 add_keyword(ks,row,'Related_Funds','Related Funds')
                 add_keyword(ks,row,'Related_Consultants','Related Consultants')
+
+                main = fund_lookup(config.get('squirro_credentials','main_file'))
+
+                for FundID in row['Related Funds'].split(','):
+                    print FundID
+                    if FundID in main:
+                        ks['Consultant Parent ID'] = main[FundID]['Consultant Parent ID']
+                        ks['Asset Class'] =  main[FundID]['Asset Class']
+                        ks['Mandate ID'] =  main[FundID]['Mandate ID']
+                        ks['Search Consultant'] =  main[FundID]['Search Consultant']
+                        ks['Search Status'] = main[FundID]['Search Status']
+                        ks['Fund Status Last Updated'] = main[FundID]['Last Updated']
+                        ks['Fund Region'] = main[FundID]['Region']
+                        ks['Fund Type'] = main[FundID]['Fund Type']
+                        ks['Consultant ID'] = main[FundID]['Consultant ID']
+                        ks['Sub Asset Class'] = main[FundID]['Sub Asset Class']
+                        ks['Mandate Size Amount'] = main[FundID]['Mandate Size Amount']
+                        ks['Fund ID'] = main[FundID]['Fund ID']
+
                 item['keywords'] = ks
                 items.append(item)      
             except:

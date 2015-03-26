@@ -32,7 +32,8 @@ def add_keyword(ks,row,key_name,field_name):
 
 
 def fund_lookup(main_file):
-    #open the main file that we use for reference
+    #open the main file that we use for reference, create a dictionary with the fundID as the key
+    #and a list of the main content as a value 
     with open(main_file, 'rb') as mainfile:
         reader = csv.DictReader(mainfile, delimiter='|', quotechar=' ')
         main = {}
@@ -99,13 +100,24 @@ def main(args, config):
 
                         print 'True: ', FundID
 
-                # main = fund_lookup(config.get('squirro_credentials','main_file'))
-                # for FundID in row['Related Funds'].split(','):
-                #     print FundID
-                #     if FundID in main:
-                #         print main[FundID]['Fund']
-                # print related_funds
+                main = fund_lookup(config.get('squirro_credentials','main_file'))
 
+                for FundID in row['Related Funds'].split(','):
+                    print FundID
+                    if FundID in main:
+                        print main[FundID]['Consultant Parent ID']
+                        print main[FundID]['Asset Class']
+                        print main[FundID]['Mandate ID']
+                        print main[FundID]['Search Consultant']
+                        print main[FundID]['Search Status']
+                        print main[FundID]['Last Updated']
+                        print main[FundID]['Region']
+                        print main[FundID]['Fund Type']
+                        print main[FundID]['Fund']
+                        print main[FundID]['Consultant ID']
+                        print main[FundID]['Sub Asset Class']
+                        print main[FundID]['Mandate Size Amount']
+                        print main[FundID]['Fund ID']
 
                 item['body'] = u"""
                     <html>

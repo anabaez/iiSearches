@@ -57,7 +57,7 @@ def update_check(cache_folder, content_file):
     except IOError:
         #MISS
         with open(cache_file_path, 'wb') as cache_file:
-            with open(config.get('squirro_credentials','file'), 'rb') as contentfile:
+            with open(config.get('feeds','file'), 'rb') as contentfile:
                 content = csv.DictReader(contentfile, delimiter='|',quotechar=' ')
                 for row in content:
                         cache_file.write(json.dumps(row, indent=4))
@@ -67,8 +67,8 @@ def update_check(cache_folder, content_file):
 
 def main(args, config):
 
-    cache_folder = config.get('squirro_credentials','cache_folder')#'C:\Python27/iiSearches/cache'
-    content_file = config.get('squirro_credentials','file')
+    cache_folder = config.get('feeds','cache_folder')#'C:\Python27/iiSearches/cache'
+    content_file = config.get('feeds','file')
 
     #check if the content file is new
     if update_check(cache_folder,content_file):
@@ -78,14 +78,14 @@ def main(args, config):
             sys.exit(0)
 
     #open csv content file 
-    with open(config.get('squirro_credentials','file'), 'rb') as contentfile:
+    with open(config.get('feeds','file'), 'rb') as contentfile:
         items = []
         h = HTMLParser.HTMLParser()
         content = csv.DictReader(contentfile, delimiter='|',quotechar=' ')
-        uploader = ItemUploader(project_id=config.get('squirro_credentials','project_id'), 
-                                source_name=config.get('squirro_credentials','source_name'), 
-                                token=config.get('squirro_credentials','token'), 
-                                cluster=config.get('squirro_credentials','cluster'))
+        uploader = ItemUploader(project_id=config.get('squirro','project_id'), 
+                                source_name=config.get('squirro','source_name'), 
+                                token=config.get('squirro','token'), 
+                                cluster=config.get('squirro','cluster'))
         for row in content: 
             try:
                 item={}
@@ -121,7 +121,7 @@ def main(args, config):
                 add_keyword(ks,row,'Related_Funds','Related Funds')
                 add_keyword(ks,row,'Related_Consultants','Related Consultants')
 
-                main = fund_lookup(config.get('squirro_credentials','main_file'))
+                main = fund_lookup(config.get('feeds','main_file'))
 
                 for FundID in row['Related Funds'].split(','):
                         if FundID in main:

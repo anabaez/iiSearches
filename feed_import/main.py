@@ -14,6 +14,7 @@ from ftplib import FTP
 from squirro_client import ItemUploader
 import sys
 import StringIO
+import json
 
 # Script version. It's recommended to increment this with every change, to make
 # debugging easier.
@@ -28,102 +29,107 @@ def get_keywords(row, field_name):
     return row[field_name].split(',')
 
 
-def get_ftp_csv(config):
+def get_ftp(config):
     """Function to pull csv files from iisearches ftp server"""
     try:
         ftp_url = config.get('squirro', 'ftp_url')
         user = config.get('squirro', 'user')
         password = config.get('squirro', 'password')
         file_identifier = config.get('squirro', 'file_identifier')
-
         ftp = FTP(ftp_url)     # connect to host, default port
         ftp.login(user, password)
-
-        for item in ftp.nlst():
-            if file_identifier in item:
-                main_file = item
-                buf = StringIO.StringIO()
-                print ftp.retrbinary('RETR %s' % main_file, buf.write)
-                buf.seek(0)
-                csvreader = csv.DictReader(buf, delimiter='|', quotechar=' ')
-                return csvreader
+        return ftp
     except Exception as e:
-        log.exception('Could not import file %r', e)
+        log.exception('Could not access server %r', e)
         raise
 
 
 def main(args, config):
 
     """Uploads items from the feed file"""
-
+    file_identifier = config.get('squirro', 'file_identifier')
     uploader = ItemUploader(project_id=config.get('squirro', 'project_id'),
                             source_name=config.get('squirro', 'source_name'),
                             token=config.get('squirro', 'token'),
                             cluster=config.get('squirro', 'cluster'))
+    ftp = get_ftp(config)
+
+    state = {}
+    if os.path.exists('feed_state.json'):
+        with open('feed_state.json') as f:
+            state = json.load(f)
+
+    if args.ignore_hash > 0:
+        state = {}
+
+    processed_news = state.setdefault('processed_news', [])
     
+    for file_name in ftp.nlst():
+        if file_identifier in file_name and file_name not in processed_news:
+            items = []
+            buf = StringIO.StringIO()
+            print ftp.retrbinary('RETR %s' % file_name, buf.write)
+            buf.seek(0)
+            feeds_dict = csv.DictReader(buf, delimiter='|', quotechar=' ')
+            for row in feeds_dict:
+                try:
+                    if row['Fund ID'] is not None:
+                        item = {
+                            'title': str(row['Fund']) + ' - ' + str(row['Fund Type']),
+                            'link': row['URL'],
+                        }
+                        if row['Mandate Size Amount']== None:
+                            mandate_size = ''
+                        else:
+                            mandate_size = 'Mandate Size: '
 
-    feed_file = get_ftp_csv(config)
+                        body = u"""
+                                    <H5> 
+                                    Search Status: {search_status}<br/>
+                                    Last Updated: {last_updated}<br/>
+                                    Region: {region}<br/>
+                                    Search Consultant: {search_consul} <br/>
+                                    {mandate}
+                                    </H5>
 
-    items = []
-
-    for row in feed_file:
-        try:
-            #print "Story:", h.unescape(story['Comments']).replace(h.unescape('&#92;n'), '')
-            item = {
-                'title': str(row['Fund']) + ' - ' + str(row['Fund Type']),
-                'id': row['Mandate ID'],
-                'link': row['URL'],
-            }
-
-            if row['Mandate Size Amount']== None:
-                mandate_size = ''
-            else:
-                mandate_size = 'Mandate Size: '
-            #print row
-
-            # if valid_date(row['Last Updated'])==False:
-            #     print 'no date'
-            #     continue
-
-
-            body = u"""
-                        <H5> 
-                        Search Status: {search_status}<br/>
-                        Last Updated: {last_updated}<br/>
-                        Region: {region}<br/>
-                        Search Consultant: {search_consul} <br/>
-                        {mandate}
-                        </H5>
-
-                    <body>
-                    {body}
-                    </body>
-                """.format(search_status=row['Search Status'],
-                            last_updated=row['Last Updated'],
-                            mandate =mandate_size + '$' + str(row['Mandate Size Amount']),
-                            region= row['Region'],
-                            search_consul=row['Search Consultant'],
-                            sub_class=row['Sub Asset Class'],body= row['Comments'])
-
-            item['body'] = body
-
-            #Add keywords
-            keywords = {
-               'Search Status' : get_keywords(row,'Search Status'),
-               'Region': get_keywords(row, 'Region'),
-               'Search Consultant': get_keywords(row, 'Search Consultant'),
-               'Sub Asset Class':get_keywords(row, 'Sub Asset Class')
-               #'Mandate Size Amount': mandate_size + get_keywords(row, 'Mandate Size Amount')
-            }
-
-            item['keywords'] = keywords
-            items.append(item)
-
-        except Exception:
-            log.exception('Unable to parse item %r', item)
-            continue
-    uploader.upload(items)
-
+                                <body>
+                                {body}
+                                </body>
+                            """.format(search_status=row['Search Status'],
+                                        last_updated=row['Last Updated'],
+                                        mandate =mandate_size + '$' + str(row['Mandate Size Amount']),
+                                        region= row['Region'],
+                                        search_consul=row['Search Consultant'],
+                                        sub_class=row['Sub Asset Class'],body= row['Comments'])
+                        item['body'] = body
+                        #Add keywords
+                        keywords = {
+                           'Search Status' : get_keywords(row,'Search Status'),
+                           'Region': get_keywords(row, 'Region'),
+                           'Search Consultant': get_keywords(row, 'Search Consultant'),
+                           'Sub Asset Class':get_keywords(row, 'Sub Asset Class'),
+                           'Fund ID': get_keywords(row, 'Fund ID'),
+                           'Fund': get_keywords(row, 'Fund'),
+                           'Fund Type': get_keywords(row,'Fund Type'),
+                           'Asset Class': get_keywords(row, 'Asset Class'),
+                           'Mandate ID': get_keywords(row, 'Mandate ID'),
+                           'Consultant ID': get_keywords(row, 'Consultant ID'),
+                           'Consultant Parent ID': get_keywords(row, 'Consultant Parent ID')
+                           #'Mandate Size Amount': mandate_size + get_keywords(row, 'Mandate Size Amount')
+                        }
+                        item['keywords'] = keywords
+                        items.append(item)
+                        print item
+                    else:
+                        print 'None lsRow'
+                except Exception:
+                    log.exception('Unable to parse item %r', item)
+                    continue
+            print 'Uploading file'
+            processed_news.append(file_name)
+            uploader.upload(items)
+            with open('feed_state.json', 'w') as f:
+                json.dump(state, f, indent=4)
 
 def parse_args():
     """Parse command line arguments."""
@@ -135,7 +141,8 @@ def parse_args():
                         help='Log file on disk.')
     parser.add_argument('--config-file', dest='config_file',
                         help='Configuration file to read settings from.')
-
+    parser.add_argument('--ignore_hash', '-i', action="count", default=0,
+                        help='ignore any existing hash file and load from content')
     return parser.parse_args()
 
 

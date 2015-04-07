@@ -17,6 +17,7 @@ import json
 from ftplib import FTP
 import StringIO
 from bs4 import BeautifulSoup
+from datetime import datetime
 
 # Script version. It's recommended to increment this with every change, to make
 # debugging easier.
@@ -34,72 +35,87 @@ def get_keywords(row, field_name):
         return None
 
 
-def get_ftp_csv(config):
+def get_ftp(config):
     """pull files from ftp server, returns a dictionary containing
     content from the feeds file."""
     try:
         ftp_url = config.get('squirro', 'ftp_url')
         user = config.get('squirro', 'user')
         password = config.get('squirro', 'password')
-        file_identifier = config.get('squirro', 'file_identifier')
 
-        ftp = FTP(ftp_url)     # connect to host, default port
+        ftp = FTP(ftp_url)
         ftp.login(user, password)
 
-        for item in ftp.nlst():
-            if file_identifier in item:
-                main_file = item
-                buf = StringIO.StringIO()
-                print ftp.retrbinary('RETR %s' % main_file, buf.write)
-                buf.seek(0)
-                feeds_dict = csv.DictReader(buf, delimiter='|', quotechar=' ')
-                return feeds_dict
-    except Exception as e:
-        log.error('Could not access files %r', e)
+        return ftp
+    except Exception as exc:
+        log.error('Could not access ftp server %r', exc)
         raise
 
 
 def main(args, config):
     """import files from ftp server, should check to see if file is updated"""
 
-    feeds_dict = get_ftp_csv(config)
-    items = []
-    html_parser = HTMLParser.HTMLParser()
+    file_identifier = config.get('squirro', 'file_identifier')
+    ftp = get_ftp(config)
 
-    # content = csv.DictReader(news_file, delimiter='|', quotechar=' ')
+    state = {}
 
+    if os.path.exists('news_state.json'):
+        with open('news_state.json') as f:
+            state = json.load(f)
+
+    if args.ignore_hash > 0:
+        state = {}
+
+    processed_news = state.setdefault('processed_news', [])
     uploader = ItemUploader(project_id=config.get('squirro', 'project_id'),
                             source_name=config.get('squirro', 'source_name'),
                             token=config.get('squirro', 'token'),
                             cluster=config.get('squirro', 'cluster'))
-    for row in feeds_dict:
-        try:
-            if 'rows' not in row['Article ID']:
-                print row['Title']
-                item = {'title': row['Title'],
-                    'id': row['Article ID'],
-                    'link': row['Article Link']}
-                #print BeautifulSoup(row['Body']).contents
-                #item['body'] = html_parser.unescape(row['Body'].decode('utf-8').replace('\\n', '<br/>'))
-                item['body'] = BeautifulSoup(row['Body'].replace('\\n', '<br/>')).prettify()
-                #Add keywords
-                keywords = {
-                    'iiKeyword': get_keywords(row, 'Keywords'),
-                    'Related_Mandates': get_keywords(row, 'Related Mandates'),
-                    'Related_Funds': get_keywords(row, 'Related Funds'),
-                    'Related_Consultants': get_keywords(row, 'Related Consultants'),
-                }
+    for file_name in ftp.nlst():
+        if file_identifier in file_name and file_name not in processed_news:
+            items = []
 
-                item['keywords'] = keywords
-                items.append(item)
-            else:
-                print 'none row'
+            buf = StringIO.StringIO()
+            print ftp.retrbinary('RETR %s' % file_name, buf.write)
+            buf.seek(0)
 
-        except Exception:
-            log.exception('Could not parse row: %r', row)
-            continue
-        print 'Upload Items'
-    uploader.upload(items)
+            feeds_dict = csv.DictReader(buf, delimiter='|', quotechar=' ')
+
+            for row in feeds_dict:
+                try:
+                    if row['Title'] is not None:
+                        print row['Title']
+                        item = {'title': row['Title'],
+                                'id': row['Article ID'],
+                                'link': row['Article Link']}
+
+                        #using beautiful soup here to correct the <pre> bug in squirro + deal with
+                        #escaped text using replace due to escaping characters in the item body
+                        item['body'] = BeautifulSoup(row['Body'].replace('\\n', '<br/>')).prettify()
+
+                        keywords = {
+                            'iiKeyword': get_keywords(row, 'Keywords'),
+                            'Related_Mandates': get_keywords(row, 'Related Mandates'),
+                            'Related_Funds': get_keywords(row, 'Related Funds'),
+                            'Related_Consultants': get_keywords(row, 'Related Consultants'),
+                        }
+
+                        item['keywords'] = keywords
+                        items.append(item)
+                    else:
+                        print 'none row'
+
+                except Exception:
+                    log.exception('Could not parse row: %r', row)
+                    continue
+
+            print 'Uploading file: %s' % file_name
+
+            processed_news.append(file_name)
+            uploader.upload(items)
+            with open('news_state.json', 'w') as f:
+                json.dump(state, f, indent=4)
 
 
 def parse_args():
@@ -179,5 +195,5 @@ if __name__ == '__main__':
     # run the application
     try:
         main(args, config)
-    except Exception as e:
+    except Exception as exc:
         log.exception('Processing error')

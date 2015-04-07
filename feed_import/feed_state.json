@@ -1,6 +1,11 @@
 {
-    "processed_news": [
+    "processed_feeds": [
         "EMsyndInvestecmailFeed-03-30-2015.txt", 
-        "EMsyndInvestecmailFeed-04-01-2015.txt"
+        "EMsyndInvestecmailFeed-04-01-2015.txt", 
+        "EMsyndInvestecmailFeed-04-02-2015.txt", 
+        "EMsyndInvestecmailFeed-04-03-2015.txt", 
+        "EMsyndInvestecmailFeed-04-04-2015.txt", 
+        "EMsyndInvestecmailFeed-04-05-2015.txt", 
+        "EMsyndInvestecmailFeed-04-06-2015.txt"
     ]
 }
